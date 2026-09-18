@@ -15,6 +15,8 @@ function LeadsTable() {
   const [q, setQ] = useState("");
   const [statusF, setStatusF] = useState<string>(params.get("status") ?? "all");
   const [assigneeF, setAssigneeF] = useState<string>("all");
+  const [cityF, setCityF] = useState<string>("all");
+  const [webF, setWebF] = useState<string>("all");
   const [sel, setSel] = useState<string[]>([]);
   const [assignTo, setAssignTo] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -48,10 +50,19 @@ function LeadsTable() {
       if (assigneeF === "unassigned" && l.assigned_to) return false;
       if (assigneeF === "mine" && l.assigned_to !== myId) return false;
       if (assigneeF !== "all" && assigneeF !== "unassigned" && assigneeF !== "mine" && l.assigned_to !== assigneeF) return false;
+      if (cityF === "none" && l.city) return false;
+      if (cityF !== "all" && cityF !== "none" && (l.city ?? "") !== cityF) return false;
+      if (webF === "has" && !l.website) return false;
+      if (webF === "missing" && l.website) return false;
       if (needle && !`${l.name} ${l.phone} ${l.email}`.toLowerCase().includes(needle)) return false;
       return true;
     });
-  }, [leads, q, statusF, assigneeF, myId]);
+  }, [leads, q, statusF, assigneeF, cityF, webF, myId]);
+
+  const cities = useMemo(
+    () => Array.from(new Set(leads.map((l) => (l.city ?? "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [leads]
+  );
 
   function toggle(id: string, idx: number, e?: React.ChangeEvent<HTMLInputElement>) {
     const shift = (e?.nativeEvent as MouseEvent | undefined)?.shiftKey;
@@ -140,6 +151,16 @@ function LeadsTable() {
           <option value="mine">My leads</option>
           <option value="unassigned">Unassigned</option>
           {profiles.map((p) => <option key={p.id} value={p.id}>{p.name ?? p.email}</option>)}
+        </select>
+        <select aria-label="Filter by city" className="field w-full sm:w-auto" value={cityF} onChange={(e) => setCityF(e.target.value)}>
+          <option value="all">All cities</option>
+          <option value="none">No city</option>
+          {cities.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select aria-label="Filter by website" className="field w-full sm:w-auto" value={webF} onChange={(e) => setWebF(e.target.value)}>
+          <option value="all">With/without website</option>
+          <option value="has">Has website</option>
+          <option value="missing">No website</option>
         </select>
       </div>
 
