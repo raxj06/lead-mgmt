@@ -1,5 +1,7 @@
 # Boostify Lead CRM
 
+Live: https://lead-mgmt-five.vercel.app
+
 Quick internal CRM: add leads, import CSV/XLSX, assign, call log + follow-up, kanban.
 
 ## Setup
