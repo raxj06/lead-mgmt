@@ -13,10 +13,12 @@ const ACT_DOT: Record<Activity["type"], string> = {
 
 function smartValue(v: string | null) {
   if (!v) return "—";
-  if (/^https?:\/\//i.test(v.trim()))
+  const t = v.trim();
+  const href = /^https?:\/\//i.test(t) ? t : /^[^\s]+\.[a-z]{2,}(\/\S*)?$/i.test(t) ? `https://${t}` : null;
+  if (href)
     return (
-      <a href={v.trim()} target="_blank" rel="noreferrer" className="block break-all text-[#298DFF] hover:underline">
-        {v}
+      <a href={href} target="_blank" rel="noreferrer" className="block break-all text-[#298DFF] hover:underline">
+        {t}
       </a>
     );
   return v;
@@ -147,6 +149,7 @@ export default function LeadDetail() {
             <dl className="mt-3 grid grid-cols-1 gap-x-4 gap-y-3 text-sm min-[420px]:grid-cols-2">
               <div className="min-w-0"><dt className="text-xs text-[#5B6472]">Phone</dt><dd className="break-all font-mono text-[13px]">{lead.phone ?? "—"}</dd></div>
               <div className="min-w-0"><dt className="text-xs text-[#5B6472]">Email</dt><dd className="break-all">{smartValue(lead.email)}</dd></div>
+              <div className="min-w-0"><dt className="text-xs text-[#5B6472]">Website</dt><dd className="break-all">{smartValue(lead.website)}</dd></div>
               <div className="min-w-0"><dt className="text-xs text-[#5B6472]">City</dt><dd className="break-all">{lead.city ?? "—"}</dd></div>
               <div className="min-w-0"><dt className="text-xs text-[#5B6472]">Source</dt><dd className="break-all">{smartValue(lead.source)}</dd></div>
             </dl>

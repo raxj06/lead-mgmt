@@ -39,6 +39,7 @@ export interface Lead {
   name: string;
   phone: string | null;
   email: string | null;
+  website: string | null;
   source: string | null;
   city: string | null;
   status: Status;

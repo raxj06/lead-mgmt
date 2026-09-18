@@ -187,7 +187,7 @@ function LeadsTable() {
                   📞 {l.phone ?? "No phone"}
                 </a>
                 <p className="mt-0.5 truncate text-[13px] text-[#5B6472]">
-                  {[l.email, l.city, l.source].filter(Boolean).join(" · ") || "No details yet"}
+                  {[l.email, l.website, l.city, l.source].filter(Boolean).join(" · ") || "No details yet"}
                 </p>
                 <p className="mt-0.5 text-xs text-[#5B6472]">
                   {nameOf(l.assigned_to) === "—" ? "Unassigned" : `Assigned to ${nameOf(l.assigned_to)}`}
