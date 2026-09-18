@@ -4,15 +4,40 @@ import { STATUSES, STATUS_DOT, STATUS_LABEL } from "@/lib/types";
 
 export default async function DashboardHome() {
   const supabase = await createClient();
-  const { data: leads } = await supabase.from("leads").select("id,status,followup_date,name,phone");
-  const list = leads ?? [];
-  const byStatus = Object.fromEntries(STATUSES.map((s) => [s, list.filter((l) => l.status === s).length]));
   const today = new Date().toISOString().slice(0, 10);
-  const active = list.filter((l) => l.status !== "Converted" && l.status !== "Lost").length;
+
+  // counts only — no row data transferred
+  const counts = await Promise.all(
+    STATUSES.map((s) =>
+      supabase.from("leads").select("id", { count: "exact", head: true }).eq("status", s)
+    )
+  );
+  const byStatus = Object.fromEntries(STATUSES.map((s, i) => [s, counts[i].count ?? 0]));
+  const total = Object.values(byStatus).reduce((a, b) => a + b, 0);
+
+  // only rows that actually need display
+  const [{ data: overdue }, { data: dueToday }] = await Promise.all([
+    supabase
+      .from("leads")
+      .select("id,name,phone,followup_date")
+      .lt("followup_date", today)
+      .not("status", "in", "(Converted,Lost)")
+      .order("followup_date", { ascending: true })
+      .limit(10),
+    supabase
+      .from("leads")
+      .select("id,name,phone")
+      .eq("followup_date", today)
+      .not("status", "in", "(Converted,Lost)")
+      .order("created_at", { ascending: false })
+      .limit(10),
+  ]);
+
+  const active = total - (byStatus["Converted"] ?? 0) - (byStatus["Lost"] ?? 0);
   const converted = byStatus["Converted"] ?? 0;
-  const rate = list.length ? Math.round((converted / list.length) * 100) : 0;
-  const overdue = list.filter((l) => l.followup_date && l.followup_date < today && l.status !== "Converted" && l.status !== "Lost");
-  const dueToday = list.filter((l) => l.followup_date === today);
+  const rate = total ? Math.round((converted / total) * 100) : 0;
+  const overdueList = overdue ?? [];
+  const dueList = dueToday ?? [];
 
   return (
     <div className="space-y-6">
@@ -20,7 +45,7 @@ export default async function DashboardHome() {
         <div className="mr-auto">
           <h1 className="font-display text-2xl font-bold text-[#0B0E13]">Overview</h1>
           <p className="text-sm text-[#5B6472]">
-            {list.length} leads · {active} active · {rate}% converted
+            {total} leads · {active} active · {rate}% converted
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:flex">
@@ -32,11 +57,11 @@ export default async function DashboardHome() {
       <div className="card p-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold">Pipeline progress</h2>
-          <span className="text-xs text-[#5B6472]">{converted} of {list.length} converted</span>
+          <span className="text-xs text-[#5B6472]">{converted} of {total} converted</span>
         </div>
         <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-[#EEF2F7]" aria-hidden="true">
           {STATUSES.map((s) => (
-            <span key={s} className={`${STATUS_DOT[s]} h-full`} style={{ width: `${list.length ? (byStatus[s] / list.length) * 100 : 0}%` }} />
+            <span key={s} className={`${STATUS_DOT[s]} h-full`} style={{ width: `${total ? (byStatus[s] / total) * 100 : 0}%` }} />
           ))}
         </div>
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
@@ -64,32 +89,32 @@ export default async function DashboardHome() {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="card p-4">
           <div className="mb-2 flex items-center justify-between">
-            <h2 className="font-semibold">Follow-ups overdue ({overdue.length})</h2>
-            {overdue.length > 10 && (
+            <h2 className="font-semibold">Follow-ups overdue ({overdueList.length})</h2>
+            {overdueList.length >= 10 && (
               <Link href="/dashboard/leads" className="text-xs text-[#298DFF] hover:underline">View all</Link>
             )}
           </div>
-          {overdue.slice(0, 10).map((l) => (
+          {overdueList.map((l) => (
             <Link key={l.id} href={`/dashboard/leads/${l.id}`} className="block border-b py-1.5 text-sm last:border-0 hover:text-[#298DFF]">
               {l.name} <span className="text-[#5B6472]">· {l.phone}</span> ·{" "}
               <span className="font-medium text-red-600">● {l.followup_date}</span>
             </Link>
           ))}
-          {!overdue.length && <p className="text-sm text-[#5B6472]">Nothing overdue. Nice.</p>}
+          {!overdueList.length && <p className="text-sm text-[#5B6472]">Nothing overdue. Nice.</p>}
         </div>
         <div className="card p-4">
           <div className="mb-2 flex items-center justify-between">
-            <h2 className="font-semibold">Due today ({dueToday.length})</h2>
-            {dueToday.length > 10 && (
+            <h2 className="font-semibold">Due today ({dueList.length})</h2>
+            {dueList.length >= 10 && (
               <Link href="/dashboard/leads" className="text-xs text-[#298DFF] hover:underline">View all</Link>
             )}
           </div>
-          {dueToday.slice(0, 10).map((l) => (
+          {dueList.map((l) => (
             <Link key={l.id} href={`/dashboard/leads/${l.id}`} className="block border-b py-1.5 text-sm last:border-0 hover:text-[#298DFF]">
               {l.name} <span className="text-[#5B6472]">· {l.phone}</span>
             </Link>
           ))}
-          {!dueToday.length && (
+          {!dueList.length && (
             <p className="text-sm text-[#5B6472]">
               Nothing due today. <Link href="/dashboard/leads" className="text-[#298DFF] hover:underline">Pick up a lead →</Link>
             </p>

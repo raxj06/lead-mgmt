@@ -2,7 +2,9 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  // collect refreshed cookies; applied once to the final response below
+  type CookieOptions = NonNullable<Parameters<NextResponse["cookies"]["set"]>[2]>;
+  const refreshed: { name: string; value: string; options?: CookieOptions }[] = [];
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -15,10 +17,7 @@ export async function proxy(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
+          refreshed.push(...cookiesToSet);
         },
       },
     }
@@ -28,11 +27,22 @@ export async function proxy(request: NextRequest) {
   const isLogin = request.nextUrl.pathname.startsWith("/login");
   const isRoot = request.nextUrl.pathname === "/";
   if (!isAuth && !isLogin) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    const redirect = NextResponse.redirect(new URL("/login", request.url));
+    refreshed.forEach(({ name, value, options }) =>
+      redirect.cookies.set(name, value, options)
+    );
+    return redirect;
   }
   if (isAuth && (isLogin || isRoot)) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
+  // forward the email so dashboard layout skips a second getUser() round trip
+  const headers = new Headers(request.headers);
+  if (isAuth && data.user?.email) headers.set("x-user-email", data.user.email);
+  const response = NextResponse.next({ request: { headers } });
+  refreshed.forEach(({ name, value, options }) =>
+    response.cookies.set(name, value, options)
+  );
   return response;
 }
 

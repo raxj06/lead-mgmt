@@ -70,11 +70,18 @@ function Column({ status, leads, onMove }: { status: Status; leads: Lead[]; onMo
 export default function KanbanPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
+  const [capped, setCapped] = useState(false);
 
   async function load() {
     const supabase = createClient();
-    const { data } = await supabase.from("leads").select("*").order("created_at", { ascending: false }).limit(2000);
+    // lean columns only; capped — kanban is a working view, not an archive
+    const { data } = await supabase
+      .from("leads")
+      .select("id,name,phone,status,followup_date")
+      .order("created_at", { ascending: false })
+      .limit(500);
     setLeads((data as Lead[]) ?? []);
+    setCapped((data?.length ?? 0) >= 500);
     setLoading(false);
   }
   // fetch-on-mount from Supabase (external system sync)
@@ -102,6 +109,11 @@ export default function KanbanPage() {
       <div className="mr-auto">
         <h1 className="font-display text-2xl font-bold text-[#0B0E13]">Kanban</h1>
         <p className="text-sm text-[#5B6472]">Drag cards by the handle, or use the stage dropdown on any card.</p>
+        {capped && (
+          <p className="rounded-lg border border-[#BFDBFE] bg-[#E3EFFF] px-3 py-2 text-sm">
+            Showing the 500 most recent leads. Use Leads filters for older ones.
+          </p>
+        )}
       </div>
       {loading ? (
         <div className="flex gap-3 overflow-auto pb-4" aria-label="Loading board">
